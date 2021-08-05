@@ -3,6 +3,19 @@
 import redis
 from uuid import uuid4
 from typing import Union, Callable, Optional
+from functools import wraps
+UnionOfTypes = Union[str, bytes, int, float]
+
+
+def count_calls(method: Callable) -> Callable:
+    """ decorator Counts how many times methods of Cache class are called """
+    @wraps(method)
+    def wrapper(self, *args, **kwds):
+        """wrapper of decorator"""
+        key = method.__qualname__
+        self._redis.incr(key)
+        return method(self, *args, **kwds)
+    return wrapper
 
 
 class Cache:
@@ -13,8 +26,9 @@ class Cache:
         self._redis = redis.Redis()
         self._redis.flushdb()
 
+    @count_calls
     def store(self,
-              data: Union[str, bytes, int, float]) -> str:
+              data: UnionOfTypes) -> str:
         """
         Method takes a data argument and returns a string
         Generate a random key (e.g. using uuid), store the input data in Redis
@@ -26,7 +40,7 @@ class Cache:
 
     def get(self,
             key: str,
-            fn: Optional[Callable] = None) -> Union[str, bytes, int, float]:
+            fn: Optional[Callable] = None) -> UnionOfTypes:
         """
         Retrieves data stored at a key
         converts the data back to the desired format
@@ -36,8 +50,8 @@ class Cache:
 
     def get_str(self, data: str) -> str:
         """ get a string """
-        return self._redis.get(data).decode('utf-8')
+        return self.get(key, str)
 
     def get_int(self, data: str) -> int:
         """ get an int """
-        return int(self._redis.get(data))
+        return self.get(key, int)
